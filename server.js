@@ -44,6 +44,17 @@ const guessImageType = (pathname) => {
   return "image/jpeg";
 };
 
+const detectImageType = (buf, fallbackType) => {
+  if (!buf || buf.length < 12) return fallbackType || null;
+
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return "image/gif";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+
+  return fallbackType || null;
+};
+
 app.get("/api/image", async (req, res) => {
   const { url } = req.query;
   if (!url || typeof url !== "string") {
@@ -68,25 +79,33 @@ app.get("/api/image", async (req, res) => {
   try {
     const upstream = await fetch(parsed.toString(), {
       headers: {
-        "User-Agent": "PanelVerse/1.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PanelVerse/1.0",
         "Referer": "https://mangadex.org/",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
     });
     if (!upstream.ok) {
       const text = await upstream.text();
-      console.warn("Image proxy upstream error", upstream.status, parsed.toString());
-      return res.status(upstream.status).send(text);
+      console.warn("Image proxy upstream error", upstream.status, parsed.toString(), text.slice(0, 120));
+      return res.status(502).json({ error: "Upstream image fetch failed" });
     }
 
+    const buf = Buffer.from(await upstream.arrayBuffer());
     const upstreamType = upstream.headers.get("content-type");
-    const contentType = upstreamType && upstreamType.startsWith("image/")
+    const fallbackType = upstreamType && upstreamType.startsWith("image/")
       ? upstreamType
       : guessImageType(parsed.pathname);
+    const contentType = detectImageType(buf, fallbackType);
+
+    if (!contentType) {
+      console.warn("Image proxy non-image response", parsed.toString(), upstreamType);
+      return res.status(502).json({ error: "Invalid image response" });
+    }
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    upstream.body.pipe(res);
+    res.status(200).end(buf);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch image" });
