@@ -1,9 +1,10 @@
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
 import * as mangaApi from "./manga.js";
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
@@ -34,6 +35,42 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+app.get("/api/image", async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "Missing url" });
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return res.status(400).json({ error: "Invalid url" });
+  }
+
+  const isMangaDex =
+    parsed.hostname === "mangadex.org" ||
+    parsed.hostname.endsWith(".mangadex.org");
+
+  if (!isMangaDex) {
+    return res.status(403).json({ error: "Host not allowed" });
+  }
+
+  try {
+    const upstream = await fetch(parsed.toString());
+    if (!upstream.ok) {
+      return res.status(upstream.status).send(await upstream.text());
+    }
+
+    res.setHeader("Content-Type", upstream.headers.get("content-type") || "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    upstream.body.pipe(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch image" });
+  }
+});
 
 app.get("/api/search", async (req, res) => {
   const query = req.query.query || "";

@@ -1,6 +1,10 @@
 import fetch from "node-fetch";  // Node version of fetch
 
 const BASE_URL = "https://api.mangadex.org";
+const BACKEND_BASE_URL = (process.env.PUBLIC_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+
+const proxyImage = (url) =>
+  `${BACKEND_BASE_URL}/api/image?url=${encodeURIComponent(url)}`;
 
 /* ----------------------------------
    Helpers
@@ -41,9 +45,9 @@ const formatManga = (m) => {
     title:getEnglishTitle(m),
 
     // 👇 USE THESE
-    imageThumb: coverBase ? `${coverBase}.256.jpg` : "/placeholder.jpg",
-    imageMedium: coverBase ? `${coverBase}.512.jpg` : "/placeholder.jpg",
-    imageFull: coverBase || "/placeholder.jpg",
+    imageThumb: coverBase ? proxyImage(`${coverBase}.256.jpg`) : "/placeholder.jpg",
+    imageMedium: coverBase ? proxyImage(`${coverBase}.512.jpg`) : "/placeholder.jpg",
+    imageFull: coverBase ? proxyImage(coverBase) : "/placeholder.jpg",
 
     author: authorRel?.attributes?.name || "Unknown",
 
@@ -271,6 +275,6 @@ export const getChapterPages = async (chapterId) => {
 
   return chapter.data.map((file, index) => ({
     index,
-    image: `${baseUrl}/data/${chapter.hash}/${file}`,
+    image: proxyImage(`${baseUrl}/data/${chapter.hash}/${file}`),
   }));
 };
