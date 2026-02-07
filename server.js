@@ -17,8 +17,9 @@ const allowLocalOrigins = (origin, callback) => {
     const { hostname, origin: fullOrigin } = new URL(origin);
     const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
     const isAllowed = allowedOrigins.includes(fullOrigin);
+    const isVercelPreview = hostname.endsWith(".vercel.app");
 
-    if (isLocal || isAllowed) {
+    if (isLocal || isAllowed || isVercelPreview) {
       return callback(null, true);
     }
   } catch {
