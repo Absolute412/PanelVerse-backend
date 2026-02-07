@@ -36,6 +36,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+const guessImageType = (pathname) => {
+  const lower = pathname.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+};
+
 app.get("/api/image", async (req, res) => {
   const { url } = req.query;
   if (!url || typeof url !== "string") {
@@ -58,13 +66,26 @@ app.get("/api/image", async (req, res) => {
   }
 
   try {
-    const upstream = await fetch(parsed.toString());
+    const upstream = await fetch(parsed.toString(), {
+      headers: {
+        "User-Agent": "PanelVerse/1.0",
+        "Referer": "https://mangadex.org/",
+      },
+    });
     if (!upstream.ok) {
-      return res.status(upstream.status).send(await upstream.text());
+      const text = await upstream.text();
+      console.warn("Image proxy upstream error", upstream.status, parsed.toString());
+      return res.status(upstream.status).send(text);
     }
 
-    res.setHeader("Content-Type", upstream.headers.get("content-type") || "image/jpeg");
+    const upstreamType = upstream.headers.get("content-type");
+    const contentType = upstreamType && upstreamType.startsWith("image/")
+      ? upstreamType
+      : guessImageType(parsed.pathname);
+
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     upstream.body.pipe(res);
   } catch (err) {
     console.error(err);
