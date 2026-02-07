@@ -70,7 +70,8 @@ app.get("/api/image", async (req, res) => {
 
   const isMangaDex =
     parsed.hostname === "mangadex.org" ||
-    parsed.hostname.endsWith(".mangadex.org");
+    parsed.hostname.endsWith(".mangadex.org") ||
+    parsed.hostname.endsWith(".mangadex.network");
 
   if (!isMangaDex) {
     return res.status(403).json({ error: "Host not allowed" });
