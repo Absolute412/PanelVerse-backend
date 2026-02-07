@@ -253,7 +253,7 @@ export const getAllChapters = async (mangaId) => {
 
   return allChapters.map(ch => ({
     id: ch.id,
-    number: ch.attributes.chapter ?? "—",
+    number: ch.attributes.chapter ?? null,
     title: ch.attributes.title || `Chapter ${ch.attributes.chapter ?? "?"}`,
     volume: ch.attributes.volume ?? "N/A",
     pages: ch.attributes.pages ?? 0,
