@@ -150,6 +150,18 @@ app.get("/api/latest", async (req, res) => {
   }
 });
 
+app.get("/api/recently-added", async (req, res) => {
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = parseInt(req.query.offset) || 0;
+  try {
+    const mangas = await mangaApi.getRecentlyAddedManga(limit, offset);
+    res.json(mangas);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch recently added manga" });
+  }
+});
+
 app.get("/api/manga/:id", async (req, res) => {
   try {
     const manga = await mangaApi.getManga(req.params.id);

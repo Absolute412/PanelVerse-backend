@@ -203,6 +203,38 @@ export const getPopularManga = async (limit = 20, offset = 0) => {
   return data.data.map(formatManga);
 };
 
+/* ----------------------------------
+   RECENTLY ADDED MANGA
+---------------------------------- */
+export const getRecentlyAddedManga = async (limit = 20, offset = 0) => {
+  const url = new URL(`${BASE_URL}/manga`);
+
+  url.searchParams.set("limit", limit);
+  url.searchParams.set("offset", offset);
+  url.searchParams.set("hasAvailableChapters", "true");
+
+  // content ratings
+  url.searchParams.append("contentRating[]", "safe");
+  url.searchParams.append("contentRating[]", "suggestive");
+  url.searchParams.append("contentRating[]", "erotica");
+
+  // language
+  url.searchParams.append("availableTranslatedLanguage[]", "en");
+
+  // relations
+  url.searchParams.append("includes[]", "cover_art");
+  url.searchParams.append("includes[]", "author");
+
+  // recently added by MangaDex creation date
+  url.searchParams.set("order[createdAt]", "desc");
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to fetch recently added manga");
+
+  const data = await res.json();
+  return data.data.map(formatManga);
+};
+
 
 /* ----------------------------------
    SINGLE MANGA PAGE
