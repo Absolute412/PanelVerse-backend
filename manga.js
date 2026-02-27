@@ -1,8 +1,10 @@
 import fetch from "node-fetch";  // Node version of fetch
 
 const BASE_URL = "https://api.mangadex.org";
+// Public backend URL used to generate absolute image-proxy links.
 const BACKEND_BASE_URL = (process.env.PUBLIC_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
 
+// Route image requests through backend so browser never fetches MangaDex images directly.
 const proxyImage = (url) =>
   `${BACKEND_BASE_URL}/api/image?url=${encodeURIComponent(url)}`;
 
@@ -31,6 +33,7 @@ const getEnglishTitle = (manga) => {
 };
 
 const formatManga = (m) => {
+  // Relationship payload includes linked entities (cover, author, etc).
   const coverRel = m.relationships.find(r => r.type === "cover_art");
   const authorRel = m.relationships.find(r => r.type === "author");
 
@@ -90,7 +93,7 @@ export const searchManga = async (query, limit = 20) => {
    LATEST MANGA (Browse default)
 ---------------------------------- */
 export const getLatestManga = async (limit = 20) => {
-  // Step 1: get latest chapters (true "latest releases")
+  // Step 1: read latest chapter feed and keep only one freshest chapter per manga.
   const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 48);
   const latestByMangaId = new Map();
   let offset = 0;
@@ -119,7 +122,7 @@ export const getLatestManga = async (limit = 20) => {
 
     const publishDate = new Date(publishAt);
 
-    // MangaDex sometimes sends fake future dates (2037 bug)
+    // Skip known MangaDex bad future timestamps.
     if (publishDate > new Date()) continue;
 
     if (publishDate < cutoff) continue;
@@ -139,7 +142,7 @@ export const getLatestManga = async (limit = 20) => {
   const mangaIds = Array.from(latestByMangaId.keys());
   if (mangaIds.length === 0) return [];
 
-  // Step 2: fetch manga info (covers/author)
+  // Step 2: fetch metadata for the selected manga ids in one request.
   const mangaUrl = new URL(`${BASE_URL}/manga`);
   mangaUrl.searchParams.set("limit", mangaIds.length);
   mangaIds.forEach((id) => mangaUrl.searchParams.append("ids[]", id));
@@ -253,6 +256,7 @@ export const getManga = async (mangaId) => {
 
 const formatDate = (iso) => {
   if (!iso) return "Unknown";
+  // Keep a compact yyyy-mm-dd string for chapter rows.
   return iso.split("T")[0]; // 2023-09-05
 };
 
@@ -261,6 +265,7 @@ const formatDate = (iso) => {
    CHAPTERS
 ---------------------------------- */
 export const getAllChapters = async (mangaId) => {
+  // MangaDex chapter list is paginated; collect all pages in batches of 100.
   let allChapters = [];
   let offset = 0;
   const limit = 100;
@@ -297,6 +302,7 @@ export const getAllChapters = async (mangaId) => {
    CHAPTER PAGES
 ---------------------------------- */
 export const getChapterPages = async (chapterId) => {
+  // At-home endpoint returns `baseUrl` + chapter hash + file names for page URLs.
   const res = await fetch(`${BASE_URL}/at-home/server/${chapterId}`);
   if (!res.ok) throw new Error(`MangaDex error ${res.status}`);
 

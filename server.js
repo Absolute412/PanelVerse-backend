@@ -6,11 +6,15 @@ import * as mangaApi from "./manga.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Comma-separated allowlist, e.g. "https://app.com,https://staging.app.com".
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// CORS origin checker:
+// - always allow non-browser/SSR requests (no Origin header)
+// - allow localhost, explicit allowlist, and Vercel preview domains
 const allowLocalOrigins = (origin, callback) => {
   if (!origin) return callback(null, true);
 
@@ -36,6 +40,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Fallback type from file extension if upstream omits/has wrong content-type.
 const guessImageType = (pathname) => {
   const lower = pathname.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
@@ -45,6 +50,7 @@ const guessImageType = (pathname) => {
 };
 
 const detectImageType = (buf, fallbackType) => {
+  // Verify magic bytes so we only serve real images from proxy endpoint.
   if (!buf || buf.length < 12) return fallbackType || null;
 
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
@@ -56,6 +62,7 @@ const detectImageType = (buf, fallbackType) => {
 };
 
 app.get("/api/image", async (req, res) => {
+  // Image proxy endpoint used by frontend cover/page URLs.
   const { url } = req.query;
   if (!url || typeof url !== "string") {
     return res.status(400).json({ error: "Missing url" });
@@ -78,6 +85,7 @@ app.get("/api/image", async (req, res) => {
   }
 
   try {
+    // Use browser-like headers; some upstreams block bare server fetches.
     const upstream = await fetch(parsed.toString(), {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PanelVerse/1.0",
@@ -114,6 +122,7 @@ app.get("/api/image", async (req, res) => {
 });
 
 app.get("/api/search", async (req, res) => {
+  // Search endpoint for navbar and browse page.
   const query = req.query.query || "";
   const limit = parseInt(req.query.limit) || 20;
 
@@ -126,7 +135,7 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
-// Routes
+// Manga listing/detail routes.
 app.get("/api/popular", async (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
   const offset = parseInt(req.query.offset) || 0;
