@@ -2,11 +2,11 @@ import fetch from "node-fetch";  // Node version of fetch
 
 const BASE_URL = "https://api.mangadex.org";
 // Public backend URL used to generate absolute image-proxy links.
-const BACKEND_BASE_URL = (process.env.PUBLIC_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
 
 // Route image requests through backend so browser never fetches MangaDex images directly.
 const proxyImage = (url) =>
-  `${BACKEND_BASE_URL}/api/image?url=${encodeURIComponent(url)}`;
+  `${PUBLIC_BASE_URL}/api/image?url=${encodeURIComponent(url)}`;
 
 /* ----------------------------------
    Helpers
