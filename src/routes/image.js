@@ -3,6 +3,9 @@ import fetch from "node-fetch";
 
 const router = express.Router();
 
+const imageCache = new Map();
+const IMAGE_TTL = 1000 * 60 * 60 * 24;  // 24 hours
+
 // helpers
 const guessImageType = (pathname) => {
   const lower = pathname.toLowerCase();
@@ -26,6 +29,7 @@ const detectImageType = (buf, fallbackType) => {
 // route
 router.get("/image", async (req, res) => {
   const { url } = req.query;
+
   if (!url || typeof url !== "string") {
     return res.status(400).json({ error: "Missing url" });
   }
@@ -46,14 +50,37 @@ router.get("/image", async (req, res) => {
     return res.status(403).json({ error: "Host not allowed" });
   }
 
+  /* ----------------------------------
+     CHECK CACHE FIRST
+  ---------------------------------- */
+  const cacheKey = parsed.toString();
+  const cached = imageCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < IMAGE_TTL) {
+    console.log("CACHE HIT", cacheKey);
+    res.setHeader("Content-Type", cached.contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+    return res.status(200).end(cached.buffer);
+  }
+
+  let timeout;
+
   try {
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), 10000);
+
     const upstream = await fetch(parsed.toString(), {
+      signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 PanelVerse/1.0",
         "Referer": "https://mangadex.org/",
         "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
     });
+
+    clearTimeout(timeout);
 
     if (!upstream.ok) {
       const text = await upstream.text();
@@ -62,6 +89,7 @@ router.get("/image", async (req, res) => {
     }
 
     const buf = Buffer.from(await upstream.arrayBuffer());
+
     const upstreamType = upstream.headers.get("content-type");
     const fallbackType = upstreamType?.startsWith("image/")
       ? upstreamType
@@ -73,13 +101,34 @@ router.get("/image", async (req, res) => {
       return res.status(502).json({ error: "Invalid image response" });
     }
 
+    /* ----------------------------------
+       SAVE TO CACHE
+    ---------------------------------- */
+    imageCache.set(cacheKey, {
+      buffer: buf,
+      contentType,
+      timestamp: Date.now(),
+    });
+
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+    if (imageCache.size > 500) {
+      const firstKey = imageCache.keys().next().value;
+      imageCache.delete(firstKey);
+    }
+
     res.status(200).end(buf);
   } catch (err) {
+    clearTimeout(timeout);
+
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch image" });
+    
+    if (!res.headersSent) {
+      res.setHeader("Content-Type", "image/jpeg");
+      return res.status(200).sendFile("public/placeholder.jpg", { root: process.cwd() });
+    }
   }
 });
 

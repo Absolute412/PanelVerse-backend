@@ -12,7 +12,7 @@ const proxyImage = (url) =>
    SIMPLE GLOBAL THROTTLE
 ---------------------------------- */
 let lastRequestTime = 0;
-const MIN_INTERVAL = 300; // 300ms between ALL requests
+const MIN_INTERVAL = 500; // 500ms between ALL requests
 
 const throttle = async () => {
   const now = Date.now();
@@ -28,10 +28,12 @@ const throttle = async () => {
 const chapterCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60;   // 1 hour
 
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
 /* ----------------------------------
    FETCH (SAFE + NO RETRY STORM)
 ---------------------------------- */
-const fetchWithRetry = async (url, retries = 1) => {
+const fetchWithRetry = async (url, retries = 3) => {
   for (let i = 0; i <= retries; i++) {
     try {
       await throttle();
@@ -39,27 +41,41 @@ const fetchWithRetry = async (url, retries = 1) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "PanelVerse/1.0",
+          "Accept": "application/json",
+        },
+      });
 
       clearTimeout(timeout);
 
-      // only retry server/network errors
-      if (!res.ok && res.status < 500) {
+      // success
+      if (res.ok) return res;
+
+      // dont retry client errors
+      if (res.status < 500) {
         return res;
       }
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      return res;
+      // retry server errors (503, 500)
+      throw new Error(`HTTP ${res.status}`);
     } catch (err) {
-      if (i === retries) throw err;
-      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      const isLast = i === retries;
+
+      // if last attempt - throw
+      if (isLast) throw err;
+
+      // exponential backoff
+      const wait = 1000 * Math.pow(2, i);
+      await delay(wait);
     }
   }
 };
 
 /* ----------------------------------
-   HELPERS (UNCHANGED SAFELY)
+   HELPERS
 ---------------------------------- */
 const getEnglishTitle = (manga) => {
   const title = manga?.attributes?.title || {};
@@ -251,7 +267,10 @@ export const getAllChapters = async (mangaId) => {
     url.searchParams.set("order[chapter]", "asc");
 
     const res = await fetchWithRetry(url.toString());
-    if (!res.ok) break;
+    if (!res.ok) {
+      console.warn("Chapter fetch failed:", res.status);
+      break;
+    }
 
     const data = await res.json();
     if (!data.data.length) break;
