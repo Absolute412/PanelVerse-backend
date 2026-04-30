@@ -1,5 +1,5 @@
 import express from "express";
-import * as mangaApi from "../manga.js"
+import * as mangaApi from "../services/mangaService.js"
 
 const router = express.Router();
 
@@ -83,11 +83,20 @@ router.get("/manga/:id/chapters", async (req, res) => {
 // Chapter Pages
 router.get("/chapter/:id/pages", async (req, res) => {
   try {
-    const pages = await mangaApi.getChapterPages(req.params.id);
-    res.json(pages);
+    const pages = await mangaApi.getChapterPages(
+      req.params.id,
+      req.query.slug,
+      req.query.source
+    );
+
+    return res.json(pages);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch chapter pages" });
+    console.error("🔥 FULL ERROR:", err); // 👈 important
+
+    return res.status(500).json({
+      error: "Failed to fetch chapter pages",
+      detail: err.message, // 👈 show real reason
+    });
   }
 });
 

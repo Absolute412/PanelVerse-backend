@@ -1,10 +1,13 @@
 import express from "express";
 import fetch from "node-fetch";
+import fs from "fs"
 
 const router = express.Router();
 
 const imageCache = new Map();
 const IMAGE_TTL = 1000 * 60 * 60 * 24;  // 24 hours
+
+const fallbackBuffer = fs.readFileSync("./public/placeholder.jpg");
 
 // helpers
 const guessImageType = (pathname) => {
@@ -26,6 +29,15 @@ const detectImageType = (buf, fallbackType) => {
   return fallbackType || null;
 };
 
+const fetchWithRetry = async (url, options, retries = 1) => {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    if (retries > 0) return fetchWithRetry(url, options, retries - 1);
+    throw err;
+  }
+};
+
 // route
 router.get("/image", async (req, res) => {
   const { url } = req.query;
@@ -41,12 +53,26 @@ router.get("/image", async (req, res) => {
     return res.status(400).json({ error: "Invalid url" });
   }
 
-  const isMangaDex =
-    parsed.hostname === "mangadex.org" ||
-    parsed.hostname.endsWith(".mangadex.org") ||
-    parsed.hostname.endsWith(".mangadex.network");
+  const ALLOWED_HOSTS = [
+    // MangaDex
+    "mangadex.org",
+    "uploads.mangadex.org",
+    "mangadex.network", 
 
-  if (!isMangaDex) {
+    // MangaFire
+    "mangafire.to",
+    "static.mangafire.to",
+    "img.mangafire.to",
+
+    // Future proof
+    "weebcentral.com",
+  ];
+
+  const isAllowed = ALLOWED_HOSTS.some(host =>
+    parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
+  );
+
+  if (!isAllowed) {
     return res.status(403).json({ error: "Host not allowed" });
   }
 
@@ -71,11 +97,13 @@ router.get("/image", async (req, res) => {
     const controller = new AbortController();
     timeout = setTimeout(() => controller.abort(), 10000);
 
-    const upstream = await fetch(parsed.toString(), {
+    const referer = parsed.origin;
+
+    const upstream = await fetchWithRetry(parsed.toString(), {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 PanelVerse/1.0",
-        "Referer": "https://mangadex.org/",
+        "Referer": referer,
         "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
     });
@@ -127,7 +155,7 @@ router.get("/image", async (req, res) => {
     
     if (!res.headersSent) {
       res.setHeader("Content-Type", "image/jpeg");
-      return res.status(200).sendFile("public/placeholder.jpg", { root: process.cwd() });
+      return res.status(200).end(fallbackBuffer);
     }
   }
 });
