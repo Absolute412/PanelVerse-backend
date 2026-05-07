@@ -91,11 +91,11 @@ router.get("/chapter/:id/pages", async (req, res) => {
 
     return res.json(pages);
   } catch (err) {
-    console.error("🔥 FULL ERROR:", err); // 👈 important
+    console.error("FULL ERROR:", err);
 
     return res.status(500).json({
       error: "Failed to fetch chapter pages",
-      detail: err.message, // 👈 show real reason
+      detail: err.message,
     });
   }
 });

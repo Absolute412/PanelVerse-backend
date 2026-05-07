@@ -1,5 +1,6 @@
 import { getAllChapters } from "./sources/weebcentral.js";
 
+console.log("TEST STARTED🔥");
 const run = async () => {
   const seriesId = "01J76XYDGDQERFSK333582BNBZ"; //  frieren
 

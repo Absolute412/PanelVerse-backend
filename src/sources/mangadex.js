@@ -88,6 +88,47 @@ const getEnglishTitle = (manga) => {
   return Object.values(title)[0] || "Untitled";
 };
 
+const cleanDescription = (text) => {
+  if (!text) return "";
+
+  let cleaned = text;
+
+  // Remove footer only if it's clearly a separator block
+  if (cleaned.includes('\n---')) {
+    cleaned = cleaned.split('\n---')[0];
+  }
+
+  // Remove markdown links but keep text
+  cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // Remove raw URLs AND empty lines they leave behind
+  cleaned = cleaned.replace(/https?:\/\/[^\s]+/g, '');
+
+  // Remove markdown styling
+  cleaned = cleaned
+    .replace(/[*_>#]/g, '')   // basic markdown chars
+    .replace(/`{1,3}/g, '');
+
+  // Remove obvious link sections (more strict)
+  cleaned = cleaned.split('\n').filter(line => {
+    const l = line.toLowerCase().trim();
+
+    return !(
+      l.startsWith('links') ||
+      l.startsWith('official') ||
+      l.startsWith('read on') ||
+      l === '___'
+    );
+  }).join('\n');
+
+  // Normalize spacing
+  cleaned = cleaned
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return cleaned;
+};
+
 const formatManga = (m) => {
   const relationships = m?.relationships || [];
 
@@ -117,7 +158,7 @@ const formatManga = (m) => {
       : "/placeholder.jpg",
 
     author: authorRel?.attributes?.name || "Unknown",
-    description: m?.attributes?.description?.en || "",
+    description: cleanDescription(m?.attributes?.description?.en),
     genres:
       m?.attributes?.tags
         ?.map((t) => t?.attributes?.name?.en)

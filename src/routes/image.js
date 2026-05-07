@@ -83,7 +83,7 @@ router.get("/image", async (req, res) => {
   const cached = imageCache.get(cacheKey);
 
   if (cached && Date.now() - cached.timestamp < IMAGE_TTL) {
-    console.log("CACHE HIT", cacheKey);
+    console.log("[CACHE HIT]", cacheKey);
     res.setHeader("Content-Type", cached.contentType);
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");

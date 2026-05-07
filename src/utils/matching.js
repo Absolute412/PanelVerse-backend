@@ -22,8 +22,7 @@ export const isAuthorMatch = (dexAuthor, wcAuthorOrList) => {
 
     const dexWords = tokenizeAuthor(dexNorm);
     const wcWords = tokenizeAuthor(wcNorm);
-    if (!dexWords.length || !wcWords.length) return false;
-
+    if (!dexWords.length || !wcWords.length) return false;    
     const wcSet = new Set(wcWords);
     const common = dexWords.filter((w) => wcSet.has(w));
 
