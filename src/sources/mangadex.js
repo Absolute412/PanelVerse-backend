@@ -12,7 +12,7 @@ const proxyImage = (url) =>
    SIMPLE GLOBAL THROTTLE
 ---------------------------------- */
 let lastRequestTime = 0;
-const MIN_INTERVAL = 500; // 500ms between ALL requests
+const MIN_INTERVAL = 1000; // 1000ms between ALL requests
 
 const throttle = async () => {
   const now = Date.now();
@@ -33,13 +33,13 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ----------------------------------
    FETCH (SAFE + NO RETRY STORM)
 ---------------------------------- */
-const fetchWithRetry = async (url, retries = 3) => {
+const fetchWithRetry = async (url, retries = 5) => {
   for (let i = 0; i <= retries; i++) {
     try {
       await throttle();
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
       const res = await fetch(url, {
         signal: controller.signal,

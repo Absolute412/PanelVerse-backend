@@ -94,7 +94,13 @@ export const getAllChapters = async (id) => {
         return cached.data;
     }
 
-    const dexChapters = await mangadex.getAllChapters(id);
+    let dexChapters = [];
+
+    try {
+        dexChapters = await mangadex.getAllChapters(id);
+    } catch (err) {
+        console.error("Mangadex chapter fetch failed:", err.message);
+    }
 
     if (isStructuredSeries(dexChapters)) {
         if (DEBUG_MATCHING) {
@@ -184,7 +190,7 @@ export const getAllChapters = async (id) => {
     }
 };
 
-export const getChapterPages = async (chapterId, chapterSlug, source = "mangadex") => {
+export const getChapterPages = async (chapterId, source = "mangadex") => {
     const cacheKey = getPageCacheKey(chapterId, source);
     const cached = pageCache.get(cacheKey);
 
