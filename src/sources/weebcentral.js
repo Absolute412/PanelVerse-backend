@@ -132,6 +132,11 @@ const parseAuthorsFromSeriesHtml = (html = "") => {
   return [...authors];
 };
 
+const formatDate = (iso) => {
+  if (!iso) return "Unknown";
+  return iso.split("T")[0]; // 2023-09-05
+};
+
 const parseChaptersFromHtml = (html = "") => {
   const $ = cheerio.load(html);
   const seen = new Set();
@@ -146,6 +151,9 @@ const parseChaptersFromHtml = (html = "") => {
     const chapterId = idMatch?.[1];
     if (!chapterId || seen.has(chapterId)) return;
     seen.add(chapterId);
+
+    const timeEl = $(el).find("time");
+    const publishedAt = formatDate(timeEl.attr("datetime") || timeEl.text().trim() || "Unknown");
 
     const rawText = $(el).text();
     // Strip noisy fragments (last-read labels, inline style text, embedded timestamps).
@@ -164,7 +172,7 @@ const parseChaptersFromHtml = (html = "") => {
       title: cleanText || `Chapter ${number || "?"}`,
       volume: "N/A",
       pages: 0,
-      publishedAt: "Unknown",
+      publishedAt,
     });
   });
 
