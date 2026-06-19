@@ -1,8 +1,8 @@
 import express from "express";
-import fetch from "node-fetch";
 import fs from "fs"
 
 const router = express.Router();
+const fetch = globalThis.fetch.bind(globalThis);
 
 const imageCache = new Map();
 const IMAGE_TTL = 1000 * 60 * 60 * 24;  // 24 hours
@@ -38,17 +38,47 @@ const fetchWithRetry = async (url, options, retries = 1) => {
   }
 };
 
+const unwrapProxyUrl = (value) => {
+  let current = value;
+
+  for (let i = 0; i < 5; i += 1) {
+    if (typeof current !== "string" || !current) return current;
+
+    try {
+      const parsed = new URL(current, "http://localhost");
+      const isProxyPath = parsed.pathname.startsWith("/api/image");
+      const isLocalProxyHost =
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "::1";
+
+      if (!isProxyPath || (!isLocalProxyHost && !current.startsWith("/api/image"))) {
+        return current;
+      }
+
+      const next = parsed.searchParams.get("url");
+      if (!next || next === current) return current;
+      current = next;
+    } catch {
+      return current;
+    }
+  }
+
+  return current;
+};
+
 // route
 router.get("/image", async (req, res) => {
   const { url } = req.query;
+  const targetUrl = unwrapProxyUrl(url);
 
-  if (!url || typeof url !== "string") {
+  if (!targetUrl || typeof targetUrl !== "string") {
     return res.status(400).json({ error: "Missing url" });
   }
 
   let parsed;
   try {
-    parsed = new URL(url);
+    parsed = new URL(targetUrl);
   } catch {
     return res.status(400).json({ error: "Invalid url" });
   }
@@ -99,21 +129,25 @@ router.get("/image", async (req, res) => {
 
     const referer = parsed.origin;
 
-    const upstream = await fetchWithRetry(parsed.toString(), {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 PanelVerse/1.0",
-        "Referer": referer,
-        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-      },
-    });
+      const upstream = await fetchWithRetry(parsed.toString(), {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "PanelVerse/1.0",
+          "Referer": referer,
+          "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+      });
 
     clearTimeout(timeout);
 
     if (!upstream.ok) {
       const text = await upstream.text();
-      console.warn("Image proxy error", upstream.status, text.slice(0, 120));
-      return res.status(502).json({ error: "Upstream image fetch failed" });
+      console.warn("Image proxy error", {
+        status: upstream.status,
+        url: parsed.toString(),
+        body: text.slice(0, 120),
+      });
+      return res.status(502).json({ error: "Upstream image fetch failed", status: upstream.status });
     }
 
     const buf = Buffer.from(await upstream.arrayBuffer());

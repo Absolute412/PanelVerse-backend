@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+const fetch = globalThis.fetch.bind(globalThis);
 import * as cheerio from "cheerio"
 
 const BASE = "https://mangafire.to";

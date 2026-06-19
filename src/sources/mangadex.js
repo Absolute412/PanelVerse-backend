@@ -1,6 +1,5 @@
-import fetch from "node-fetch";
-
 const BASE_URL = "https://api.mangadex.org";
+const fetch = globalThis.fetch.bind(globalThis);
 
 const PUBLIC_BASE_URL =
   (process.env.PUBLIC_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
@@ -79,11 +78,17 @@ const fetchWithRetry = async (url, retries = 5) => {
 ---------------------------------- */
 const getEnglishTitle = (manga) => {
   const title = manga?.attributes?.title || {};
+  const altTitles = manga?.attributes?.altTitles || [];
+
+  const englishAlts = altTitles
+    .map((t) => t?.en)
+    .filter(Boolean)
+    .map((s) => s.trim());
+
+    // Prefer English title first
+    if (englishAlts.length) return englishAlts[0];
 
   if (title.en) return title.en;
-
-  const enAlt = manga?.attributes?.altTitles?.find((t) => t?.en);
-  if (enAlt) return enAlt.en;
 
   return Object.values(title)[0] || "Untitled";
 };
@@ -145,13 +150,9 @@ const formatManga = (m) => {
     id: m.id,
     title: getEnglishTitle(m),
 
-    imageThumb: coverBase
-      ? proxyImage(`${coverBase}.256.jpg`)
-      : "/placeholder.jpg",
+    imageThumb: coverBase ? proxyImage(coverBase) : "/placeholder.jpg",
 
-    imageMedium: coverBase
-      ? proxyImage(`${coverBase}.512.jpg`)
-      : "/placeholder.jpg",
+    imageMedium: coverBase ? proxyImage(coverBase) : "/placeholder.jpg",
 
     imageFull: coverBase
       ? proxyImage(coverBase)
